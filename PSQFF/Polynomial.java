@@ -5,11 +5,10 @@ import java.util.TreeMap;
 
 public class Polynomial {
 
-    private final long[] coefficients; 
-    public static int P; 
+    private final long[] coefficients;
+    public static int P;
 
     public Polynomial(long[] coeffs) {
-        // Remove leading zeros
         int degree = coeffs.length - 1;
         while (degree > 0 && coeffs[degree] == 0) {
             degree--;
@@ -18,22 +17,26 @@ public class Polynomial {
     }
 
 
+    public Polynomial(Polynomial other) {
+        this.coefficients = Arrays.copyOf(other.coefficients, other.coefficients.length);
+    }
+
     public Polynomial() {
         this.coefficients = new long[]{0};
     }
-    
+
     public int degree() {
         return coefficients.length - 1;
     }
-    
+
     public boolean isZero() {
         return degree() == 0 && coefficients[0] == 0;
     }
-    
+
     public boolean isConstant() {
         return degree() == 0;
     }
-    
+
     public long getConstantValue() {
         return coefficients[0];
     }
@@ -52,7 +55,7 @@ public class Polynomial {
         }
         return new Polynomial(newCoeffs);
     }
-    
+
     public Polynomial pthRoot() {
         if (this.isZero()) return new Polynomial();
         long[] newCoeffs = new long[degree() / P + 1];
@@ -74,31 +77,12 @@ public class Polynomial {
         return divide(a, b, null);
     }
 
-
     public static Polynomial gcd(Polynomial a, Polynomial b, StringBuilder tracer) {
-        if (tracer != null) {
-            tracer.append(String.format("Находим НОД для:\nA = %s\nB = %s\n\n", a, b));
-        }
-
         while (!b.isZero()) {
-            Polynomial[] divResult = divide(a, b, tracer);
-            Polynomial remainder = divResult[1];
-            
-            if (tracer != null) {
-                tracer.append(String.format("Проверка остатка: A = B * (%s) + (%s)\n", divResult[0], remainder));
-            }
-
+            Polynomial remainder = divide(a, b, tracer)[1];
             a = b;
             b = remainder;
-
-            if (!b.isZero() && tracer != null) {
-                tracer.append(String.format("Остаток не 0. Теперь находим НОД для A = (%s) и B = (%s)\n\n", a, b));
-            }
         }
-        if (tracer != null) {
-            tracer.append("Остаток равен 0. НОД - это последний ненулевой делитель (A).\n");
-        }
-
         if (!a.isZero()) {
             long leadCoeff = a.coefficients[a.degree()];
             if (leadCoeff != 0) {
@@ -113,56 +97,25 @@ public class Polynomial {
         return a;
     }
 
-
     public static Polynomial[] divide(Polynomial a, Polynomial b, StringBuilder tracer) {
         if (b.isZero()) {
             throw new ArithmeticException("Division by zero.");
         }
-        if (tracer != null) {
-            tracer.append(String.format("--- Шаг деления ---\nДелим (%s) на (%s)\n", a, b));
-        }
-
         Polynomial quotient = new Polynomial();
         Polynomial remainder = new Polynomial(a.coefficients);
-
         if (remainder.degree() < b.degree()) {
-             if (tracer != null) {
-                tracer.append("Степень делимого меньше степени делителя. Частное = 0, Остаток = делимое.\n");
-            }
             return new Polynomial[]{quotient, remainder};
         }
-        
         long b_lead_inv = modInverse(b.coefficients[b.degree()]);
-
         while (!remainder.isZero() && remainder.degree() >= b.degree()) {
-            if (tracer != null) {
-                tracer.append(String.format("  Текущий остаток: %s\n", remainder));
-            }
-
             int deg_diff = remainder.degree() - b.degree();
             long factor = mod(remainder.coefficients[remainder.degree()] * b_lead_inv);
-
             long[] term_coeffs = new long[deg_diff + 1];
             term_coeffs[deg_diff] = factor;
             Polynomial term = new Polynomial(term_coeffs);
-
-            if (tracer != null) {
-                 tracer.append(String.format("  Следующий член частного: %s\n", term));
-            }
-
             quotient = quotient.add(term);
             Polynomial toSubtract = term.multiply(b);
-            
-            if (tracer != null) {
-                 tracer.append(String.format("  Вычитаем (%s) * (%s) = (%s)\n", term, b, toSubtract));
-            }
-            
             remainder = remainder.subtract(toSubtract);
-        }
-        
-        if (tracer != null) {
-            tracer.append(String.format("  Конечный остаток: %s\n", remainder));
-            tracer.append("--- Конец шага деления ---\n");
         }
         return new Polynomial[]{quotient, remainder};
     }
@@ -193,9 +146,9 @@ public class Polynomial {
         }
         return new Polynomial(newCoeffs);
     }
-    
+
     public Polynomial subtract(Polynomial other) {
-         int newDegree = Math.max(this.degree(), other.degree());
+        int newDegree = Math.max(this.degree(), other.degree());
         long[] newCoeffs = new long[newDegree + 1];
         for (int i = 0; i <= this.degree(); i++) {
             newCoeffs[i] = mod(newCoeffs[i] + this.coefficients[i]);
@@ -216,6 +169,21 @@ public class Polynomial {
             }
         }
         return new Polynomial(newCoeffs);
+    }
+
+    public Polynomial pow(long exp, Polynomial modulus) {
+        Polynomial res = new Polynomial(new long[]{1});
+        Polynomial base = new Polynomial(this);
+        while (exp > 0) {
+            if (exp % 2 == 1) {
+                res = res.multiply(base);
+                if (modulus != null) res = divide(res, modulus, null)[1];
+            }
+            base = base.multiply(base);
+            if (modulus != null) base = divide(base, modulus, null)[1];
+            exp /= 2;
+        }
+        return res;
     }
 
     public static Polynomial fromString(String s) {
@@ -256,11 +224,11 @@ public class Polynomial {
             long coeff = coefficients[i];
             if (coeff == 0) continue;
             if (sb.length() > 0) {
-                 sb.append(coeff > 0 ? " + " : " - ");
-                 coeff = Math.abs(coeff);
+                sb.append(coeff > 0 ? " + " : " - ");
+                coeff = Math.abs(coeff);
             } else if (coeff < 0) {
-                 sb.append("-");
-                 coeff = Math.abs(coeff);
+                sb.append("-");
+                coeff = Math.abs(coeff);
             }
             if (coeff != 1 || i == 0) sb.append(coeff);
             if (i > 0) {
