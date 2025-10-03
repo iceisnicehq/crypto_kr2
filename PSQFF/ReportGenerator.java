@@ -2,6 +2,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class ReportGenerator {
@@ -19,21 +20,22 @@ public class ReportGenerator {
         report.append("## Основная часть: Алгоритм PSQFF\n\n");
         Map<Polynomial, Integer> ps_qffFactors = generateRecursiveSteps(p);
         
-        report.append("\n## Формирование ответа: Разложение бесквадратных множителей на неприводимые\n\n");
-        Map<Polynomial, Integer> finalFactors = new TreeMap<>((p1, p2) -> p2.degree() - p1.degree());
+        report.append("\n## Промежуточный результат (после PSQFF)\n\n");
+        String intermediateAnswer = formatFinalAnswer(ps_qffFactors);
+        report.append("p(x) = ").append(p.toString()).append(" = ").append(intermediateAnswer).append("\n");
 
+        report.append("\n## Формирование ответа: Разложение до неприводимых множителей\n\n");
+        Map<Polynomial, Integer> finalFactors = new TreeMap<>((p1, p2) -> p2.degree() - p1.degree());
+        
         for (Map.Entry<Polynomial, Integer> entry : ps_qffFactors.entrySet()) {
             Polynomial polyToFactor = entry.getKey();
             int exponent = entry.getValue();
             
-            if (polyToFactor.degree() > 1) {
-                report.append("Разлагаем множитель: ").append(polyToFactor).append("\n");
-                List<Polynomial> irreducibleFactors = distinctDegreeFactorization(polyToFactor);
-                for (Polynomial irreducible : irreducibleFactors) {
-                    finalFactors.merge(irreducible, exponent, Integer::sum);
-                }
-            } else {
-                finalFactors.merge(polyToFactor, exponent, Integer::sum);
+            report.append("Обрабатываем множитель: ").append(polyToFactor).append("\n");
+            
+            List<Polynomial> irreducibleFactors = factorByTrialDivision(polyToFactor);
+            for (Polynomial irreducible : irreducibleFactors) {
+                finalFactors.merge(irreducible, exponent, Integer::sum);
             }
         }
 
@@ -46,9 +48,7 @@ public class ReportGenerator {
     }
 
     private Map<Polynomial, Integer> generateRecursiveSteps(Polynomial p) {
-        if (p.isConstant() || p.degree() < 1) {
-            return new TreeMap<>();
-        }
+        if (p.isConstant() || p.degree() < 1) return new TreeMap<>();
         report.append("--- Шаг ").append(stepCounter++).append(". Обработка p(x) = ").append(p).append(" ---\n");
         Polynomial derivative = p.derivative();
         report.append("g(x) = p'(x) = ").append(derivative).append("\n");
@@ -83,43 +83,66 @@ public class ReportGenerator {
         }
     }
     
-    private List<Polynomial> distinctDegreeFactorization(Polynomial p) {
+    private List<Polynomial> factorByTrialDivision(Polynomial p) {
         List<Polynomial> factors = new ArrayList<>();
-        Polynomial f = new Polynomial(p);
-        Polynomial x = new Polynomial(new long[]{0, 1});
-        int d = 1;
-        while (f.degree() >= 2 * d) {
-            report.append("   - Ищем множители степени d = ").append(d).append("\n");
-            Polynomial x_pow_p_d = x.pow(power(characteristic, d), f);
-            Polynomial g = Polynomial.gcd(x_pow_p_d.subtract(x), f);
-            if (!g.isConstant()) {
-                report.append("     Найден(ы) множитель(и) степени ").append(d).append(": ").append(g).append("\n");
-                factors.add(g);
-                f = Polynomial.divide(f, g, null)[0];
-            }
-            d++;
+        Polynomial remainder = new Polynomial(p);
+        if (remainder.degree() < 1) return factors;
+        
+        long constantFactor = remainder.normalize();
+        if (constantFactor != 1) {
+            factors.add(new Polynomial(new long[]{constantFactor}));
         }
-        if (f.degree() > 0) {
-            factors.add(f);
+
+        for (long i = 0; i < characteristic; i++) {
+            Polynomial linearFactor = new Polynomial(new long[]{ (i == 0 ? 0 : characteristic - i), 1});
+            while (remainder.degree() > 0 && Polynomial.divide(remainder, linearFactor, null)[1].isZero()) {
+                factors.add(linearFactor);
+                remainder = Polynomial.divide(remainder, linearFactor, null)[0];
+                report.append("   - Найден линейный множитель: ").append(linearFactor).append(", текущий остаток: ").append(remainder).append("\n");
+            }
+        }
+
+        if (remainder.degree() > 0) {
+            factors.add(remainder);
+        }
+
+        if (factors.isEmpty()) {
+            report.append("   - Множитель ").append(p).append(" не имеет линейных корней.\n");
+            factors.add(p);
         }
         return factors;
     }
 
     private String formatFinalAnswer(Map<Polynomial, Integer> factors) {
         if (factors.isEmpty()) return "1";
-        return factors.entrySet().stream()
-                .map(entry -> {
-                    String base = "(" + entry.getKey().toString() + ")";
-                    int exp = entry.getValue();
-                    return exp > 1 ? base + "^" + exp : base;
-                })
-                .collect(Collectors.joining(" * "));
+        
+        List<Map.Entry<Polynomial, Integer>> sortedFactors = new ArrayList<>(factors.entrySet());
+        Collections.sort(sortedFactors, (a, b) -> b.getKey().degree() - a.getKey().degree());
+
+        StringBuilder result = new StringBuilder();
+        
+        for (Map.Entry<Polynomial, Integer> entry : sortedFactors) {
+             if (result.length() > 0) result.append(" * ");
+            Polynomial currentPoly = entry.getKey();
+            int exp = entry.getValue();
+
+            if (currentPoly.isConstant()) {
+                result.append(currentPoly.getConstantValue());
+            } else {
+                String base = "(" + currentPoly.toString() + ")";
+                result.append(exp > 1 ? base + "^" + exp : base);
+            }
+        }
+        return result.toString();
     }
     
     private static long power(long base, long exp) {
         long res = 1;
-        for (int i = 0; i < exp; i++) {
-            res *= base;
+        base %= Polynomial.P;
+        while (exp > 0) {
+            if (exp % 2 == 1) res = (res * base) % Polynomial.P;
+            base = (base * base) % Polynomial.P;
+            exp /= 2;
         }
         return res;
     }

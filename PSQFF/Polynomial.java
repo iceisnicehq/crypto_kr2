@@ -8,6 +8,43 @@ public class Polynomial {
     private final long[] coefficients;
     public static int P;
 
+
+
+
+
+
+
+    public long normalize() {
+        if (isZero()) return 1;
+        long leadCoeff = getLeadingCoefficient();
+        if (leadCoeff == 1) return 1;
+        
+        long inv = modInverse(leadCoeff);
+        for (int i = 0; i < coefficients.length; i++) {
+            coefficients[i] = mod(coefficients[i] * inv);
+        }
+        return leadCoeff;
+    }
+
+    public long getLeadingCoefficient() {
+        if (isZero()) return 0;
+        return coefficients[degree()];
+    }
+
+    public Polynomial divideByConstant(long c) {
+        if (c == 0) throw new ArithmeticException("Division by zero.");
+        long inv = modInverse(c);
+        long[] newCoeffs = new long[coefficients.length];
+        for (int i = 0; i < coefficients.length; i++) {
+            newCoeffs[i] = mod(coefficients[i] * inv);
+        }
+        return new Polynomial(newCoeffs);
+    }
+
+    public boolean isOne() {
+        return isConstant() && getConstantValue() == 1;
+    }
+
     public Polynomial(long[] coeffs) {
         int degree = coeffs.length - 1;
         while (degree > 0 && coeffs[degree] == 0) {
