@@ -29,6 +29,11 @@ public class PSQFF_GUI extends JFrame {
         modulusField = new JTextField("2", 3);
         JButton factorButton = new JButton("Факторизовать");
 
+        Font inputFont = new Font("SansSerif", Font.PLAIN, 20);
+        polynomialField.setFont(inputFont);
+        modulusField.setFont(inputFont);
+
+        
         inputPanel.add(new JLabel("p(x) = "));
         inputPanel.add(polynomialField);
         inputPanel.add(Box.createHorizontalStrut(10));
