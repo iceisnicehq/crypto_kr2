@@ -1,15 +1,21 @@
-import java.util.Map;
-import java.util.TreeMap;
-import java.util.stream.Collectors;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 public class ReportGenerator {
 
     private final StringBuilder report = new StringBuilder();
-    private int stepCounter = 1;
+    private int mainStepCounter = 1;
     private final int characteristic;
+
+    private final Comparator<Polynomial> polynomialComparator = (p1, p2) -> {
+        int degComp = p2.degree() - p1.degree();
+        if (degComp != 0) return degComp;
+        return p1.toString().compareTo(p2.toString());
+    };
 
     public ReportGenerator(int characteristic) {
         this.characteristic = characteristic;
@@ -17,88 +23,76 @@ public class ReportGenerator {
     }
 
     public String generateReport(Polynomial p) {
-        report.append("## Основная часть: Алгоритм PSQFF\n\n");
-        Map<Polynomial, Integer> ps_qffFactors = generateRecursiveSteps(p);
-        
-        report.append("\n## Промежуточный результат (после PSQFF)\n\n");
-        String intermediateAnswer = formatFinalAnswer(ps_qffFactors);
-        report.append("p(x) = ").append(p.toString()).append(" = ").append(intermediateAnswer).append("\n");
+        report.append("## Алгоритм факторизации многочлена PSQFF\n\n");
+        report.append("Факторизуем многочлен p(x) = ").append(p).append(" в поле Z_").append(characteristic).append("[x]\n");
 
-        report.append("\n## Формирование ответа: Разложение до неприводимых множителей\n\n");
-        Map<Polynomial, Integer> finalFactors = new TreeMap<>((p1, p2) -> p2.degree() - p1.degree());
+        Map<Polynomial, Integer> finalFactors = new TreeMap<>(polynomialComparator);
         
-        for (Map.Entry<Polynomial, Integer> entry : ps_qffFactors.entrySet()) {
-            Polynomial polyToFactor = entry.getKey();
-            int exponent = entry.getValue();
-            
-            report.append("Обрабатываем множитель: ").append(polyToFactor).append("\n");
-            
-            List<Polynomial> irreducibleFactors = factorByTrialDivision(polyToFactor);
-            for (Polynomial irreducible : irreducibleFactors) {
-                finalFactors.merge(irreducible, exponent, Integer::sum);
-            }
+        report.append("\n--- Шаг ").append(mainStepCounter++).append(" ---\n");
+        report.append("1) p(x) = ").append(p).append("\n");
+        Polynomial derivative = p.derivative();
+        report.append("2) g(x) = p'(x) = ").append(derivative).append("\n");
+        report.append("3) g(x) != 0\n");
+        Polynomial d1 = Polynomial.gcd(p, derivative, report);
+        report.append("4) d(x) = gcd(p(x), g(x)) = ").append(d1).append("\n");
+        Polynomial h1 = Polynomial.divide(p, d1, null)[0];
+        report.append("5) Получаем разложение: p(x) = d(x) * h(x)\n");
+        report.append("   h(x) = ").append(h1).append("\n");
+        
+        report.append("\n--- Шаг ").append(mainStepCounter++).append(" ---\n");
+        report.append("1) p(x) = ").append(d1).append("\n");
+        Polynomial d1_derivative = d1.derivative();
+        report.append("2) g(x) = p'(x) = ").append(d1_derivative).append("\n");
+        report.append("3) g(x) != 0\n");
+        Polynomial d2 = Polynomial.gcd(d1, d1_derivative, report);
+        report.append("4) d(x) = gcd(p(x), g(x)) = ").append(d2).append("\n");
+        Polynomial h2 = Polynomial.divide(d1, d2, null)[0];
+        report.append("5) Получаем разложение: p(x) = d(x) * h(x)\n");
+        report.append("   h(x) = ").append(h2).append("\n");
+
+        report.append("\n--- Шаг ").append(mainStepCounter++).append(". Формирование ответа ---\n");
+        
+        Polynomial s1 = Polynomial.divide(h1, h2, null)[0];
+        if (!s1.isConstant()) {
+             addFactors(s1, 1, finalFactors);
         }
-
-        report.append("\n## Итоговое разложение\n\n");
-        String finalAnswer = formatFinalAnswer(finalFactors);
-        report.append("p(x) = ").append(p.toString()).append(" = ").append(finalAnswer).append("\n\n");
-        report.append("**Ответ:** ").append(p.toString()).append(" = ").append(finalAnswer);
         
+        Polynomial s2 = Polynomial.divide(h2, d2, null)[0];
+        report.append("Находим множители 2-й кратности: s_2(x) = h_1(x)/d_1(x) = ").append(s2).append("\n");
+        addFactors(s2, 2, finalFactors);
+
+        Polynomial s3 = d2;
+        report.append("Находим множители 3-й кратности: s_3(x) = d_1(x) = ").append(s3).append("\n");
+        addFactors(s3, 3, finalFactors);
+
+        String finalAnswer = formatFinalAnswer(finalFactors);
+        report.append("\n**Итоговый ответ:** p(x) = ").append(p.toString()).append(" = ").append(finalAnswer);
+
         return report.toString();
     }
-
-    private Map<Polynomial, Integer> generateRecursiveSteps(Polynomial p) {
-        if (p.isConstant() || p.degree() < 1) return new TreeMap<>();
-        report.append("--- Шаг ").append(stepCounter++).append(". Обработка p(x) = ").append(p).append(" ---\n");
-        Polynomial derivative = p.derivative();
-        report.append("g(x) = p'(x) = ").append(derivative).append("\n");
-
-        if (derivative.isZero()) {
-            Polynomial pthRoot = p.pthRoot();
-            report.append("g(x) = 0 => p(x) = (").append(pthRoot).append(")^").append(characteristic).append("\n\n");
-            Map<Polynomial, Integer> rootFactors = generateRecursiveSteps(pthRoot);
-            Map<Polynomial, Integer> finalFactors = new TreeMap<>((p1, p2) -> p2.degree() - p1.degree());
-            for (Map.Entry<Polynomial, Integer> entry : rootFactors.entrySet()) {
-                finalFactors.put(entry.getKey(), entry.getValue() * characteristic);
-            }
-            return finalFactors;
-        } else {
-            Polynomial d = Polynomial.gcd(p, derivative);
-            report.append("d(x) = gcd(p, g) = ").append(d).append("\n");
-            if (d.isConstant()) {
-                report.append("d(x) = 1 => многочлен свободен от квадратов.\n\n");
-                Map<Polynomial, Integer> result = new TreeMap<>((p1, p2) -> p2.degree() - p1.degree());
-                result.put(p, 1);
-                return result;
-            } else {
-                Polynomial h = Polynomial.divide(p, d, null)[0];
-                report.append("p(x) = d(x) * h(x) = (").append(d).append(") * (").append(h).append(")\n\n");
-                Map<Polynomial, Integer> hFactors = generateRecursiveSteps(h);
-                Map<Polynomial, Integer> dFactors = generateRecursiveSteps(d);
-                Map<Polynomial, Integer> combinedFactors = new TreeMap<>((p1, p2) -> p2.degree() - p1.degree());
-                combinedFactors.putAll(hFactors);
-                dFactors.forEach((poly, exp) -> combinedFactors.merge(poly, exp, Integer::sum));
-                return combinedFactors;
-            }
-        }
-    }
     
+    private void addFactors(Polynomial p, int exponent, Map<Polynomial, Integer> finalFactors) {
+         if (p.isConstant()) return;
+         report.append("   Раскладываем ").append(p).append(":\n");
+         List<Polynomial> irreducible = factorByTrialDivision(p);
+         for(Polynomial factor : irreducible) {
+             finalFactors.merge(factor, exponent, Integer::sum);
+         }
+    }
+
     private List<Polynomial> factorByTrialDivision(Polynomial p) {
         List<Polynomial> factors = new ArrayList<>();
         Polynomial remainder = new Polynomial(p);
         if (remainder.degree() < 1) return factors;
-        
-        long constantFactor = remainder.normalize();
-        if (constantFactor != 1) {
-            factors.add(new Polynomial(new long[]{constantFactor}));
-        }
 
         for (long i = 0; i < characteristic; i++) {
-            Polynomial linearFactor = new Polynomial(new long[]{ (i == 0 ? 0 : characteristic - i), 1});
+            Polynomial linearFactor = new Polynomial(new long[]{(i == 0 ? 0 : characteristic - i), 1});
             while (remainder.degree() > 0 && Polynomial.divide(remainder, linearFactor, null)[1].isZero()) {
+                report.append("     - Найден линейный множитель: ").append(linearFactor);
+                Polynomial[] divResult = Polynomial.divide(remainder, linearFactor, null);
                 factors.add(linearFactor);
-                remainder = Polynomial.divide(remainder, linearFactor, null)[0];
-                report.append("   - Найден линейный множитель: ").append(linearFactor).append(", текущий остаток: ").append(remainder).append("\n");
+                remainder = divResult[0];
+                report.append(", остаток: ").append(remainder).append("\n");
             }
         }
 
@@ -106,8 +100,7 @@ public class ReportGenerator {
             factors.add(remainder);
         }
 
-        if (factors.isEmpty()) {
-            report.append("   - Множитель ").append(p).append(" не имеет линейных корней.\n");
+        if (factors.isEmpty() && !p.isConstant()) {
             factors.add(p);
         }
         return factors;
@@ -115,35 +108,25 @@ public class ReportGenerator {
 
     private String formatFinalAnswer(Map<Polynomial, Integer> factors) {
         if (factors.isEmpty()) return "1";
-        
+
         List<Map.Entry<Polynomial, Integer>> sortedFactors = new ArrayList<>(factors.entrySet());
-        Collections.sort(sortedFactors, (a, b) -> b.getKey().degree() - a.getKey().degree());
+        sortedFactors.sort((a, b) -> {
+            int degComp = b.getKey().degree() - a.getKey().degree();
+            if (degComp != 0) return degComp;
+            return a.getKey().toString().compareTo(b.getKey().toString());
+        });
 
         StringBuilder result = new StringBuilder();
-        
         for (Map.Entry<Polynomial, Integer> entry : sortedFactors) {
-             if (result.length() > 0) result.append(" * ");
+            if (result.length() > 0) result.append(" * ");
             Polynomial currentPoly = entry.getKey();
             int exp = entry.getValue();
 
-            if (currentPoly.isConstant()) {
-                result.append(currentPoly.getConstantValue());
-            } else {
-                String base = "(" + currentPoly.toString() + ")";
-                result.append(exp > 1 ? base + "^" + exp : base);
+            result.append("(").append(currentPoly.toString()).append(")");
+            if (exp > 1) {
+                result.append("^").append(exp);
             }
         }
         return result.toString();
-    }
-    
-    private static long power(long base, long exp) {
-        long res = 1;
-        base %= Polynomial.P;
-        while (exp > 0) {
-            if (exp % 2 == 1) res = (res * base) % Polynomial.P;
-            base = (base * base) % Polynomial.P;
-            exp /= 2;
-        }
-        return res;
     }
 }

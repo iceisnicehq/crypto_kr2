@@ -8,51 +8,17 @@ public class Polynomial {
     private final long[] coefficients;
     public static int P;
 
-
-
-
-
-
-
-    public long normalize() {
-        if (isZero()) return 1;
-        long leadCoeff = getLeadingCoefficient();
-        if (leadCoeff == 1) return 1;
-        
-        long inv = modInverse(leadCoeff);
-        for (int i = 0; i < coefficients.length; i++) {
-            coefficients[i] = mod(coefficients[i] * inv);
-        }
-        return leadCoeff;
-    }
-
-    public long getLeadingCoefficient() {
-        if (isZero()) return 0;
-        return coefficients[degree()];
-    }
-
-    public Polynomial divideByConstant(long c) {
-        if (c == 0) throw new ArithmeticException("Division by zero.");
-        long inv = modInverse(c);
-        long[] newCoeffs = new long[coefficients.length];
-        for (int i = 0; i < coefficients.length; i++) {
-            newCoeffs[i] = mod(coefficients[i] * inv);
-        }
-        return new Polynomial(newCoeffs);
-    }
-
-    public boolean isOne() {
-        return isConstant() && getConstantValue() == 1;
-    }
-
     public Polynomial(long[] coeffs) {
         int degree = coeffs.length - 1;
-        while (degree > 0 && coeffs[degree] == 0) {
+        while (degree > 0 && mod(coeffs[degree]) == 0) {
             degree--;
         }
-        this.coefficients = Arrays.copyOf(coeffs, degree + 1);
+        long[] newCoeffs = new long[degree + 1];
+        for (int i = 0; i < newCoeffs.length; i++) {
+            newCoeffs[i] = mod(coeffs[i]);
+        }
+        this.coefficients = newCoeffs;
     }
-
 
     public Polynomial(Polynomial other) {
         this.coefficients = Arrays.copyOf(other.coefficients, other.coefficients.length);
@@ -82,10 +48,26 @@ public class Polynomial {
         return (a % P + P) % P;
     }
 
-    public Polynomial derivative() {
-        if (degree() == 0) {
-            return new Polynomial();
+    public Polynomial normalize() {
+        if (isZero()) return this;
+        long leadCoeff = getLeadingCoefficient();
+        if (leadCoeff == 1) return this;
+
+        long inv = modInverse(leadCoeff);
+        long[] newCoeffs = new long[coefficients.length];
+        for (int i = 0; i < coefficients.length; i++) {
+            newCoeffs[i] = mod(coefficients[i] * inv);
         }
+        return new Polynomial(newCoeffs);
+    }
+
+    public long getLeadingCoefficient() {
+        if (isZero()) return 0;
+        return coefficients[degree()];
+    }
+
+    public Polynomial derivative() {
+        if (degree() == 0) return new Polynomial();
         long[] newCoeffs = new long[degree()];
         for (int i = 1; i <= degree(); i++) {
             newCoeffs[i - 1] = mod(coefficients[i] * i);
@@ -106,31 +88,28 @@ public class Polynomial {
         return new Polynomial(newCoeffs);
     }
 
-    public static Polynomial gcd(Polynomial a, Polynomial b) {
-        return gcd(a, b, null);
-    }
-
-    public static Polynomial[] divide(Polynomial a, Polynomial b) {
-        return divide(a, b, null);
-    }
-
     public static Polynomial gcd(Polynomial a, Polynomial b, StringBuilder tracer) {
-        while (!b.isZero()) {
-            Polynomial remainder = divide(a, b, tracer)[1];
-            a = b;
-            b = remainder;
+        if (tracer != null) {
+            tracer.append("\n   [Вычисление НОД]\n");
+            tracer.append(String.format("   НОД(%s, %s)\n", a, b));
         }
-        if (!a.isZero()) {
-            long leadCoeff = a.coefficients[a.degree()];
-            if (leadCoeff != 0) {
-                long inv = modInverse(leadCoeff);
-                long[] newCoeffs = new long[a.coefficients.length];
-                for (int i = 0; i < newCoeffs.length; i++) {
-                    newCoeffs[i] = mod(a.coefficients[i] * inv);
-                }
-                return new Polynomial(newCoeffs);
+
+        Polynomial r;
+        while (!b.isZero()) {
+            Polynomial[] divisionResult = divide(a, b, tracer);
+            r = divisionResult[1];
+            a = b;
+            b = r;
+            if (tracer != null && !b.isZero()) {
+                tracer.append(String.format("\n   Следующая итерация: НОД(%s, %s)\n", a, b));
             }
         }
+
+        if (tracer != null) {
+            tracer.append("   НОД найден: ").append(a).append("\n");
+            tracer.append("   [Конец вычисления НОД]\n");
+        }
+        
         return a;
     }
 
@@ -138,21 +117,34 @@ public class Polynomial {
         if (b.isZero()) {
             throw new ArithmeticException("Division by zero.");
         }
+
         Polynomial quotient = new Polynomial();
         Polynomial remainder = new Polynomial(a.coefficients);
-        if (remainder.degree() < b.degree()) {
-            return new Polynomial[]{quotient, remainder};
+
+        if (tracer != null) {
+            tracer.append(String.format("\n     Деление в столбик: (%s) / (%s)\n", a, b));
         }
-        long b_lead_inv = modInverse(b.coefficients[b.degree()]);
-        while (!remainder.isZero() && remainder.degree() >= b.degree()) {
-            int deg_diff = remainder.degree() - b.degree();
-            long factor = mod(remainder.coefficients[remainder.degree()] * b_lead_inv);
-            long[] term_coeffs = new long[deg_diff + 1];
-            term_coeffs[deg_diff] = factor;
-            Polynomial term = new Polynomial(term_coeffs);
-            quotient = quotient.add(term);
-            Polynomial toSubtract = term.multiply(b);
-            remainder = remainder.subtract(toSubtract);
+
+        if (remainder.degree() < b.degree()) {
+            if (tracer != null) {
+                tracer.append("     Степень делимого меньше степени делителя.\n");
+            }
+        } else {
+            long b_lead_inv = modInverse(b.coefficients[b.degree()]);
+            while (!remainder.isZero() && remainder.degree() >= b.degree()) {
+                int deg_diff = remainder.degree() - b.degree();
+                long factor = mod(remainder.coefficients[remainder.degree()] * b_lead_inv);
+                long[] term_coeffs = new long[deg_diff + 1];
+                term_coeffs[deg_diff] = factor;
+                Polynomial term = new Polynomial(term_coeffs);
+                quotient = quotient.add(term);
+                Polynomial toSubtract = term.multiply(b);
+                remainder = remainder.subtract(toSubtract);
+            }
+        }
+
+        if (tracer != null) {
+            tracer.append(String.format("     Результат: (%s) = (%s) * (%s) + (%s)\n", a, b, quotient, remainder));
         }
         return new Polynomial[]{quotient, remainder};
     }
@@ -208,39 +200,27 @@ public class Polynomial {
         return new Polynomial(newCoeffs);
     }
 
-    public Polynomial pow(long exp, Polynomial modulus) {
-        Polynomial res = new Polynomial(new long[]{1});
-        Polynomial base = new Polynomial(this);
-        while (exp > 0) {
-            if (exp % 2 == 1) {
-                res = res.multiply(base);
-                if (modulus != null) res = divide(res, modulus, null)[1];
-            }
-            base = base.multiply(base);
-            if (modulus != null) base = divide(base, modulus, null)[1];
-            exp /= 2;
-        }
-        return res;
-    }
-
     public static Polynomial fromString(String s) {
         s = s.replace("-", "+ -").replaceAll("\\s+", "");
         String[] terms = s.split("\\+");
         Map<Integer, Long> coeffMap = new TreeMap<>(Collections.reverseOrder());
         for (String term : terms) {
             if (term.isEmpty()) continue;
-            long coeff = 1; int degree = 0;
+            long coeff = 1;
+            int degree = 0;
+            term = term.replace(" ", "");
             if (term.contains("x")) {
                 String[] parts = term.split("x", -1);
                 String coeffPart = parts[0];
-                String degreePart = (parts.length > 1) ? parts[1] : "";
+                String degreePart = (parts.length > 1) ? parts[1].replace("^", "") : "";
                 if (coeffPart.isEmpty() || coeffPart.equals("+")) coeff = 1;
                 else if (coeffPart.equals("-")) coeff = -1;
                 else coeff = Long.parseLong(coeffPart);
                 if (degreePart.isEmpty()) degree = 1;
-                else degree = Integer.parseInt(degreePart.substring(1));
+                else degree = Integer.parseInt(degreePart);
             } else {
-                coeff = Long.parseLong(term); degree = 0;
+                coeff = Long.parseLong(term);
+                degree = 0;
             }
             coeffMap.put(degree, mod(coeffMap.getOrDefault(degree, 0L) + coeff));
         }
@@ -261,11 +241,7 @@ public class Polynomial {
             long coeff = coefficients[i];
             if (coeff == 0) continue;
             if (sb.length() > 0) {
-                sb.append(coeff > 0 ? " + " : " - ");
-                coeff = Math.abs(coeff);
-            } else if (coeff < 0) {
-                sb.append("-");
-                coeff = Math.abs(coeff);
+                sb.append(" + ");
             }
             if (coeff != 1 || i == 0) sb.append(coeff);
             if (i > 0) {
@@ -273,6 +249,19 @@ public class Polynomial {
                 if (i > 1) sb.append("^").append(i);
             }
         }
-        return sb.toString();
+        return sb.toString().replace(" + -", " - ");
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Polynomial that = (Polynomial) o;
+        return Arrays.equals(coefficients, that.coefficients);
+    }
+
+    @Override
+    public int hashCode() {
+        return Arrays.hashCode(coefficients);
     }
 }
