@@ -1,3 +1,5 @@
+package gelfondshanks;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.TitledBorder;
