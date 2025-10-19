@@ -1,4 +1,4 @@
-// package InteractiveIndexCalculus;
+package InteractiveIndexCalculus;
 
 import javax.swing.*;
 import java.awt.*;
