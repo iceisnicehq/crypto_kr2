@@ -12,12 +12,10 @@ public class PSQFF_GUI extends JFrame {
     public PSQFF_GUI() {
         setTitle("Алгоритм факторизации многочленов PSQFF");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        //setExtendedState(JFrame.MAXIMIZED_BOTH); 
         
-        // REMOVED this line:
-        // setExtendedState(JFrame.MAXIMIZED_BOTH); 
-        
-        // We will call this LATER
-        // setLocationRelativeTo(null); 
+        //setLocationRelativeTo(null); 
 
         JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
         mainPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
@@ -55,15 +53,8 @@ public class PSQFF_GUI extends JFrame {
 
         add(mainPanel);
 
-        // --- ADDED AND MOVED LINES ---
-        
-        // 1. Set a good default size for the window
         setSize(1000, 700); 
-        
-        // 2. Now, center the window on the screen
         setLocationRelativeTo(null); 
-        
-        // 3. Make it visible
         setVisible(true);
     }
 
