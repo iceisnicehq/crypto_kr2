@@ -5,14 +5,14 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.math.BigInteger; // Используем для modInverse
 
-public class Polynomial {
+public class Polynomial1 {
 
     private final long[] coefficients;
     // ВАЖНО: Убрали static P, теперь модуль - это свойство каждого объекта
     private final int modulus;
 
     // Конструктор теперь требует модуль
-    public Polynomial(long[] coeffs, int modulus) {
+    public Polynomial1(long[] coeffs, int modulus) {
         this.modulus = modulus;
         int degree = coeffs.length - 1;
         while (degree > 0 && mod(coeffs[degree]) == 0) {
@@ -26,13 +26,13 @@ public class Polynomial {
     }
 
     // Конструктор копирования
-    public Polynomial(Polynomial other) {
+    public Polynomial1(Polynomial1 other) {
         this.coefficients = Arrays.copyOf(other.coefficients, other.coefficients.length);
         this.modulus = other.modulus;
     }
 
     // Конструктор для создания нулевого многочлена
-    public Polynomial(int modulus) {
+    public Polynomial1(int modulus) {
         this.coefficients = new long[]{0};
         this.modulus = modulus;
     }
@@ -54,7 +54,7 @@ public class Polynomial {
         return (a % modulus + modulus) % modulus;
     }
     
-    public Polynomial normalize() {
+    public Polynomial1 normalize() {
         if (isZero()) return this;
         long leadCoeff = getLeadingCoefficient();
         if (leadCoeff == 1) return this;
@@ -64,7 +64,7 @@ public class Polynomial {
         for (int i = 0; i < coefficients.length; i++) {
             newCoeffs[i] = mod(coefficients[i] * inv);
         }
-        return new Polynomial(newCoeffs, this.modulus);
+        return new Polynomial1(newCoeffs, this.modulus);
     }
 
     public long getLeadingCoefficient() {
@@ -72,17 +72,17 @@ public class Polynomial {
         return coefficients[degree()];
     }
 
-    public Polynomial derivative() {
-        if (degree() == 0) return new Polynomial(this.modulus);
+    public Polynomial1 derivative() {
+        if (degree() == 0) return new Polynomial1(this.modulus);
         long[] newCoeffs = new long[degree()];
         for (int i = 1; i <= degree(); i++) {
             newCoeffs[i - 1] = mod(coefficients[i] * i);
         }
-        return new Polynomial(newCoeffs, this.modulus);
+        return new Polynomial1(newCoeffs, this.modulus);
     }
 
-    public Polynomial pthRoot() {
-        if (this.isZero()) return new Polynomial(this.modulus);
+    public Polynomial1 pthRoot() {
+        if (this.isZero()) return new Polynomial1(this.modulus);
         long[] newCoeffs = new long[degree() / this.modulus + 1];
         for (int i = 0; i <= degree(); i++) {
             if (i % this.modulus == 0) {
@@ -93,31 +93,31 @@ public class Polynomial {
                 throw new IllegalArgumentException("Polynomial is not a p-th power.");
             }
         }
-        return new Polynomial(newCoeffs, this.modulus);
+        return new Polynomial1(newCoeffs, this.modulus);
     }
 
-    public static Polynomial gcd(Polynomial a, Polynomial b, StringBuilder tracer) {
+    public static Polynomial1 gcd(Polynomial1 a, Polynomial1 b, StringBuilder tracer) {
         if (tracer != null) {
             tracer.append("\n   [Вычисление НОД]\n");
             tracer.append(String.format("   НОД(%s, %s)\n", a, b));
         }
 
         while (!b.isZero()) {
-            Polynomial r = divide(a, b, tracer)[1];
+            Polynomial1 r = divide(a, b, tracer)[1];
             a = b;
             b = r;
         }
         return a;
     }
     
-    public static Polynomial[] divide(Polynomial a, Polynomial b, StringBuilder tracer) {
+    public static Polynomial1[] divide(Polynomial1 a, Polynomial1 b, StringBuilder tracer) {
         if (b.isZero()) throw new ArithmeticException("Division by zero.");
 
-        Polynomial quotient = new Polynomial(a.modulus);
-        Polynomial remainder = new Polynomial(a);
+        Polynomial1 quotient = new Polynomial1(a.modulus);
+        Polynomial1 remainder = new Polynomial1(a);
 
         if (remainder.degree() < b.degree()) {
-            return new Polynomial[]{quotient, remainder};
+            return new Polynomial1[]{quotient, remainder};
         }
 
         long b_lead_inv = modInverse(b.getLeadingCoefficient(), b.modulus);
@@ -127,14 +127,14 @@ public class Polynomial {
             
             long[] term_coeffs = new long[deg_diff + 1];
             term_coeffs[deg_diff] = factor;
-            Polynomial term = new Polynomial(term_coeffs, a.modulus);
+            Polynomial1 term = new Polynomial1(term_coeffs, a.modulus);
             
             quotient = quotient.add(term);
-            Polynomial toSubtract = term.multiply(b);
+            Polynomial1 toSubtract = term.multiply(b);
             remainder = remainder.subtract(toSubtract);
         }
 
-        return new Polynomial[]{quotient, remainder};
+        return new Polynomial1[]{quotient, remainder};
     }
 
     // ИЗМЕНЕНИЕ: modInverse теперь статический и принимает модуль
@@ -142,28 +142,28 @@ public class Polynomial {
         return BigInteger.valueOf(n).modInverse(BigInteger.valueOf(modulus)).longValue();
     }
     
-    public Polynomial add(Polynomial other) {
+    public Polynomial1 add(Polynomial1 other) {
         int newDegree = Math.max(this.degree(), other.degree());
         long[] newCoeffs = new long[newDegree + 1];
         System.arraycopy(this.coefficients, 0, newCoeffs, 0, this.coefficients.length);
         for (int i = 0; i <= other.degree(); i++) {
             newCoeffs[i] = mod(newCoeffs[i] + other.coefficients[i]);
         }
-        return new Polynomial(newCoeffs, this.modulus);
+        return new Polynomial1(newCoeffs, this.modulus);
     }
 
-    public Polynomial subtract(Polynomial other) {
+    public Polynomial1 subtract(Polynomial1 other) {
          int newDegree = Math.max(this.degree(), other.degree());
         long[] newCoeffs = new long[newDegree + 1];
         System.arraycopy(this.coefficients, 0, newCoeffs, 0, this.coefficients.length);
         for (int i = 0; i <= other.degree(); i++) {
             newCoeffs[i] = mod(newCoeffs[i] - other.coefficients[i]);
         }
-        return new Polynomial(newCoeffs, this.modulus);
+        return new Polynomial1(newCoeffs, this.modulus);
     }
 
-    public Polynomial multiply(Polynomial other) {
-        if (this.isZero() || other.isZero()) return new Polynomial(this.modulus);
+    public Polynomial1 multiply(Polynomial1 other) {
+        if (this.isZero() || other.isZero()) return new Polynomial1(this.modulus);
         int newDegree = this.degree() + other.degree();
         long[] newCoeffs = new long[newDegree + 1];
         for (int i = 0; i <= this.degree(); i++) {
@@ -171,17 +171,17 @@ public class Polynomial {
                 newCoeffs[i + j] = mod(newCoeffs[i + j] + this.coefficients[i] * other.coefficients[j]);
             }
         }
-        return new Polynomial(newCoeffs, this.modulus);
+        return new Polynomial1(newCoeffs, this.modulus);
     }
     
     // ИЗМЕНЕНИЕ: fromString теперь статический и принимает модуль
-    public static Polynomial fromString(String s, int modulus) {
+    public static Polynomial1 fromString(String s, int modulus) {
         s = s.replace("-", "+ -").replaceAll("\\s+", "");
         if (s.startsWith("+")) s = s.substring(1);
 
         Map<Integer, Long> coeffMap = new TreeMap<>(Collections.reverseOrder());
         if (s.isEmpty() || s.equals("0")) {
-            return new Polynomial(new long[]{0}, modulus);
+            return new Polynomial1(new long[]{0}, modulus);
         }
         
         String[] terms = s.split("\\+");
@@ -211,7 +211,7 @@ public class Polynomial {
         for (Map.Entry<Integer, Long> entry : coeffMap.entrySet()) {
             coeffs[entry.getKey()] = entry.getValue();
         }
-        return new Polynomial(coeffs, modulus);
+        return new Polynomial1(coeffs, modulus);
     }
 
     @Override
@@ -247,7 +247,7 @@ public class Polynomial {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        Polynomial that = (Polynomial) o;
+        Polynomial1 that = (Polynomial1) o;
         return modulus == that.modulus && Arrays.equals(coefficients, that.coefficients);
     }
 

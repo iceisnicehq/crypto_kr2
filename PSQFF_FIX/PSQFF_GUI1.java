@@ -4,13 +4,13 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 
-public class PSQFF_GUI extends JFrame {
+public class PSQFF_GUI1 extends JFrame {
 
     private final JTextField polynomialField;
     private final JTextField modulusField;
     private final JTextArea resultArea;
 
-    public PSQFF_GUI() {
+    public PSQFF_GUI1() {
         setTitle("Алгоритм факторизации многочленов PSQFF");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
@@ -74,9 +74,9 @@ public class PSQFF_GUI extends JFrame {
             }
 
             // ИЗМЕНЕНИЕ: Передаем модуль в fromString
-            Polynomial p = Polynomial.fromString(polyString, modulus);
+            Polynomial1 p = Polynomial1.fromString(polyString, modulus);
 
-            ReportGenerator generator = new ReportGenerator(modulus);
+            ReportGenerator1 generator = new ReportGenerator1(modulus);
             String report = generator.generateReport(p);
             
             resultArea.setText(report);
@@ -91,6 +91,6 @@ public class PSQFF_GUI extends JFrame {
     }
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(PSQFF_GUI::new);
+        SwingUtilities.invokeLater(PSQFF_GUI1::new);
     }
 }
