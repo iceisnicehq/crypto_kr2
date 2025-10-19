@@ -1,4 +1,4 @@
-package PollardRho;
+// package PollardRho;
 
 import javax.swing.*;
 import java.awt.*;

@@ -1,3 +1,4 @@
+// Файл: PSQFF_GUI.java (ИЗМЕНЕННАЯ ВЕРСИЯ)
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
@@ -13,18 +14,15 @@ public class PSQFF_GUI extends JFrame {
         setTitle("Алгоритм факторизации многочленов PSQFF");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        //setExtendedState(JFrame.MAXIMIZED_BOTH); 
-        
-        //setLocationRelativeTo(null); 
-
         JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
         mainPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
 
         JPanel inputPanel = new JPanel();
         inputPanel.setLayout(new BoxLayout(inputPanel, BoxLayout.X_AXIS));
 
-        polynomialField = new JTextField("x^5 + 5x^3 + 4x^2 + 2x + 4");
-        modulusField = new JTextField("7", 3);
+        // Ставим по умолчанию проблемный пример
+        polynomialField = new JTextField("x^2 + 1");
+        modulusField = new JTextField("2", 3);
         JButton factorButton = new JButton("Факторизовать");
 
         Font inputFont = new Font("SansSerif", Font.PLAIN, 20);
@@ -52,20 +50,15 @@ public class PSQFF_GUI extends JFrame {
         factorButton.addActionListener(this::performFactorization);
 
         add(mainPanel);
-
         setSize(1000, 700); 
         setLocationRelativeTo(null); 
         setVisible(true);
     }
 
     private boolean isPrime(int n) {
-        if (n <= 1) {
-            return false;
-        }
+        if (n <= 1) return false;
         for (int i = 2; i * i <= n; i++) {
-            if (n % i == 0) {
-                return false;
-            }
+            if (n % i == 0) return false;
         }
         return true;
     }
@@ -80,10 +73,12 @@ public class PSQFF_GUI extends JFrame {
                 return;
             }
 
-            ReportGenerator generator = new ReportGenerator(modulus);
-            Polynomial p = Polynomial.fromString(polyString);
+            // ИЗМЕНЕНИЕ: Передаем модуль в fromString
+            Polynomial p = Polynomial.fromString(polyString, modulus);
 
+            ReportGenerator generator = new ReportGenerator(modulus);
             String report = generator.generateReport(p);
+            
             resultArea.setText(report);
             resultArea.setCaretPosition(0);
 
