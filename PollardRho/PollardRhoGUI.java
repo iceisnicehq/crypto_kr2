@@ -1,8 +1,9 @@
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -36,8 +37,6 @@ public class PollardRhoGUI extends JFrame {
 
         gbc.anchor = GridBagConstraints.EAST; 
         gbc.fill = GridBagConstraints.NONE;
-        gbc.weightx = 0.0;
-        gbc.weighty = 0.0;
         
         gbc.gridx = 0; gbc.gridy = 0; add(new JLabel("a (основание):"), gbc);
         gbc.gridx = 0; gbc.gridy = 1; add(new JLabel("b (результат):"), gbc);
@@ -67,38 +66,31 @@ public class PollardRhoGUI extends JFrame {
         resultArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
         add(new JScrollPane(resultArea), gbc);
 
-
         aField.setText("3");
         bField.setText("12");
         pField.setText("17");
 
+        solveButton.addActionListener(e -> {
+            try {
+                BigInteger a = new BigInteger(aField.getText().trim());
+                BigInteger b = new BigInteger(bField.getText().trim());
+                BigInteger p = new BigInteger(pField.getText().trim());
 
-        solveButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                try {
-                    BigInteger a = new BigInteger(aField.getText().trim());
-                    BigInteger b = new BigInteger(bField.getText().trim());
-                    BigInteger p = new BigInteger(pField.getText().trim());
+                resultArea.setText("Генерирую таблицу и ищу коллизию...\n" + 
+                                   a + "^x ≡ " + b + " (mod " + p + ")\n");
+                solveButton.setEnabled(false); 
+                new SolverTask(a, b, p).execute(); 
 
-                    resultArea.setText("Генерирую таблицу и ищу коллизию...\n" + 
-                                       a + "^x ≡ " + b + " (mod " + p + ")\n");
-                    solveButton.setEnabled(false); 
-                    new SolverTask(a, b, p).execute(); 
-
-                } catch (NumberFormatException ex) {
-                    resultArea.setText("Ошибка: Введите корректные целые числа.");
-                    solveButton.setEnabled(true);
-                }
+            } catch (NumberFormatException ex) {
+                resultArea.setText("Ошибка: Введите корректные целые числа.");
+                solveButton.setEnabled(true);
             }
         });
 
-       
         setMinimumSize(new Dimension(1000, 800)); 
         pack();
         setLocationRelativeTo(null); 
     }
-
 
     private class SolverTask extends SwingWorker<String, Void> {
         private final BigInteger a, b, p;
@@ -114,6 +106,14 @@ public class PollardRhoGUI extends JFrame {
             StringBuilder sb = new StringBuilder(); 
             BigInteger pMinus1 = p.subtract(BigInteger.ONE);
 
+            sb.append("Определяем интервалы для z_i:\n");
+            BigDecimal p_dec = new BigDecimal(p);
+            BigDecimal p_div_3_dec = p_dec.divide(new BigDecimal(3), 2, RoundingMode.FLOOR);
+            BigDecimal p_mul_2_div_3_dec = p_dec.multiply(new BigDecimal(2)).divide(new BigDecimal(3), 2, RoundingMode.FLOOR);
+            sb.append(String.format("T1:    0        < z_i <= %s (%s/3)\n", p_div_3_dec, p));
+            sb.append(String.format("T2:    %s  < z_i <= %s (2*%s/3)\n", p_div_3_dec, p_mul_2_div_3_dec, p));
+            sb.append(String.format("T3:    %s < z_i <    %s\n\n", p_mul_2_div_3_dec, p));
+
             ArrayList<PollardState> history = new ArrayList<>();
             Map<BigInteger, Integer> zMap = new HashMap<>(); 
 
@@ -121,12 +121,14 @@ public class PollardRhoGUI extends JFrame {
             history.add(currentState);
             zMap.put(currentState.z, 0);
 
-            int k = 1; 
+            // ИЗМЕНЕНИЕ: k -> j (индекс текущей, большей итерации)
+            int j = 1; 
             while (true) {
                 PollardState nextState = nextStep(currentState);
 
                 if (zMap.containsKey(nextState.z)) {
-                    int j = zMap.get(nextState.z);
+                    // ИЗМЕНЕНИЕ: j -> k (индекс прошлой, меньшей итерации)
+                    int k = zMap.get(nextState.z);
                     history.add(nextState); 
 
                     sb.append(String.format("%-4s | %-5s | %-5s | %-5s\n", "i", "u_i", "v_i", "z_i"));
@@ -137,40 +139,43 @@ public class PollardRhoGUI extends JFrame {
                     }
                     sb.append("\n");
 
-                    sb.append(String.format("Коллизия найдена: z_%d = z_%d = %s\n", j, k, nextState.z));
+                    // ИЗМЕНЕНИЕ: Правильный порядок k и j
+                    sb.append(String.format("Коллизия найдена: z_%d = z_%d = %s\n", k, j, nextState.z));
                     
-                    PollardState state_j = history.get(j); 
-                    PollardState state_k = nextState;      
+                    PollardState state_k = history.get(k); // Состояние с меньшим индексом
+                    PollardState state_j = nextState;      // Состояние с большим индексом
 
-                    BigInteger u_j = state_j.u;
-                    BigInteger v_j = state_j.v;
-                    BigInteger u_k = state_k.u;
-                    BigInteger v_k = state_k.v;
+                    BigInteger u_k = state_k.u; BigInteger v_k = state_k.v;
+                    BigInteger u_j = state_j.u; BigInteger v_j = state_j.v;
                     
-                    sb.append(String.format("i = %d, k = %d\n", k, j));
-                    sb.append(String.format("u_%d = %s, v_%d = %s\n", k, u_k, k, v_k));
+                    // ИЗМЕНЕНИЕ: Правильный порядок j и k
+                    sb.append(String.format("j = %d, k = %d\n", j, k));
                     sb.append(String.format("u_%d = %s, v_%d = %s\n", j, u_j, j, v_j));
+                    sb.append(String.format("u_%d = %s, v_%d = %s\n", k, u_k, k, v_k));
                     sb.append("\n");
-
-                    BigInteger u_diff = u_j.subtract(u_k).mod(pMinus1); 
-                    BigInteger v_diff = v_k.subtract(v_j).mod(pMinus1); 
+                    
+                    // ИЗМЕНЕНИЕ: Используем правильную формулу (u_j - u_k) и (v_k - v_j)
+                    BigInteger u_diff_raw = u_j.subtract(u_k);
+                    BigInteger v_diff_raw = v_k.subtract(v_j);
 
                     sb.append(String.format("x ≡ (u_%d - u_%d)⁻¹ * (v_%d - v_%d) mod (%s - 1)\n", j, k, k, j, p));
                     sb.append(String.format("x ≡ (%s - %s)⁻¹ * (%s - %s) mod %s\n", u_j, u_k, v_k, v_j, pMinus1));
-                    sb.append(String.format("x ≡ (%s)⁻¹ * (%s) mod %s\n", u_diff, v_diff, pMinus1));
+                    sb.append(String.format("x ≡ (%s)⁻¹ * (%s) mod %s\n", u_diff_raw, v_diff_raw, pMinus1));
                     
-                    if (!u_diff.gcd(pMinus1).equals(BigInteger.ONE)) {
+                    BigInteger u_diff_mod = u_diff_raw.mod(pMinus1);
+                    if (!u_diff_mod.gcd(pMinus1).equals(BigInteger.ONE)) {
                          sb.append("\nОшибка: не существует обратного элемента, т.к.\n");
                          sb.append(String.format("НОД(u_j - u_k, p-1) = НОД(%s, %s) = %s ≠ 1\n",
-                                 u_diff, pMinus1, u_diff.gcd(pMinus1)));
+                                 u_diff_mod, pMinus1, u_diff_mod.gcd(pMinus1)));
                          return sb.toString();
                     }
                     
-                    BigInteger u_diff_inv = u_diff.modInverse(pMinus1);
-                    sb.append(String.format("x ≡ %s * %s mod %s\n", u_diff_inv, v_diff, pMinus1));
+                    BigInteger u_diff_inv = u_diff_mod.modInverse(pMinus1);
+                    BigInteger v_diff_mod = v_diff_raw.mod(pMinus1);
+                    sb.append(String.format("x ≡ %s * %s mod %s\n", u_diff_inv, v_diff_mod, pMinus1));
                     
-                    BigInteger x = u_diff_inv.multiply(v_diff).mod(pMinus1);
-                    sb.append(String.format("x = %s\n\n", x));
+                    BigInteger x = u_diff_inv.multiply(v_diff_mod).mod(pMinus1);
+                    sb.append(String.format("x = %s mod %s\n\n", x, pMinus1));
                     
                     BigInteger check = a.modPow(x, p);
                     sb.append("Проверка: " + a + "^" + x + " mod " + p + " = " + check);
@@ -180,19 +185,17 @@ public class PollardRhoGUI extends JFrame {
                         sb.append(" (Неверно!)");
                     }
                     
-                    if (a.equals(new BigInteger("3")) && b.equals(new BigInteger("12")) && p.equals(new BigInteger("17"))) {
-                         sb.append("\n(Ответ в примере: 13)");
-                    }
+                    sb.append(String.format("\n\nОтвет: %s mod %s", x, pMinus1));
 
                     return sb.toString(); 
                 }
 
                 history.add(nextState);
-                zMap.put(nextState.z, k);
+                zMap.put(nextState.z, j);
                 currentState = nextState;
-                k++;
+                j++; // ИЗМЕНЕНИЕ: k++ -> j++
 
-                if (k > p.intValue() * 2) {
+                if (j > p.intValue() * 2) { // ИЗМЕНЕНИЕ: k -> j
                     throw new ArithmeticException("Коллизия не найдена (превышен лимит итераций)");
                 }
             }
@@ -201,56 +204,30 @@ public class PollardRhoGUI extends JFrame {
         @Override
         protected void done() {
             try {
-
-                String result = get(); 
-                resultArea.setText(result);
-                
+                resultArea.setText(get());
             } catch (InterruptedException | ExecutionException e) {
                 resultArea.setText("Ошибка вычисления: \n" + e.getCause().getMessage());
+            } finally {
+                solveButton.setEnabled(true); 
             }
-            
-            solveButton.setEnabled(true); 
         }
 
         private PollardState nextStep(PollardState currentState) {
-            BigInteger z = currentState.z;
-            BigInteger u = currentState.u;
-            BigInteger v = currentState.v;
+            BigInteger z = currentState.z; BigInteger u = currentState.u; BigInteger v = currentState.v;
             BigInteger pMinus1 = p.subtract(BigInteger.ONE);
-
             BigInteger p_div_3 = p.divide(BigInteger.valueOf(3));
             BigInteger p_mul_2_div_3 = p.multiply(BigInteger.valueOf(2)).divide(BigInteger.valueOf(3));
-
-            BigInteger nextZ = null;
-            BigInteger nextU = null;
-            BigInteger nextV = null;
-
-            if (z.compareTo(BigInteger.ZERO) > 0 && z.compareTo(p_div_3) <= 0) {
-                nextZ = b.multiply(z).mod(p);                 
-                nextU = u.add(BigInteger.ONE).mod(pMinus1);   
-                nextV = v.mod(pMinus1);                       
+            if (z.compareTo(p_div_3) <= 0) {
+                return new PollardState(b.multiply(z).mod(p), u.add(BigInteger.ONE).mod(pMinus1), v);
+            } else if (z.compareTo(p_mul_2_div_3) <= 0) {
+                return new PollardState(z.modPow(BigInteger.TWO, p), u.multiply(BigInteger.TWO).mod(pMinus1), v.multiply(BigInteger.TWO).mod(pMinus1));
+            } else {
+                return new PollardState(a.multiply(z).mod(p), u, v.add(BigInteger.ONE).mod(pMinus1));
             }
-            else if (z.compareTo(p_div_3) > 0 && z.compareTo(p_mul_2_div_3) <= 0) {
-                nextZ = z.modPow(BigInteger.TWO, p);          
-                nextU = u.multiply(BigInteger.TWO).mod(pMinus1); 
-                nextV = v.multiply(BigInteger.TWO).mod(pMinus1); 
-            }
-            else {
-                nextZ = a.multiply(z).mod(p);                 
-                nextU = u.mod(pMinus1);                       
-                nextV = v.add(BigInteger.ONE).mod(pMinus1);   
-            }
-            
-            return new PollardState(nextZ, nextU, nextV);
         }
     }
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                new PollardRhoGUI().setVisible(true);
-            }
-        });
+        SwingUtilities.invokeLater(() -> new PollardRhoGUI().setVisible(true));
     }
 }
